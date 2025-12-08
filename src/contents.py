@@ -17,11 +17,12 @@ function respond_json($statusCode, $payload) {
 }
 
 function load_config($envPath) {
-    $defaultMaxBytes = 5 * 1024 * 1024;
+    $defaultMaxMB = 5;
     $defaultExts = 'jpg,jpeg,png,webp,gif';
     $env = @parse_ini_file($envPath);
     $key = ($env && isset($env['HALAL_BLOB_KEY'])) ? trim($env['HALAL_BLOB_KEY']) : '';
-    $maxBytes = ($env && isset($env['HALAL_BLOB_MAX_BYTES']) && is_numeric($env['HALAL_BLOB_MAX_BYTES'])) ? (int)$env['HALAL_BLOB_MAX_BYTES'] : $defaultMaxBytes;
+    $maxMB = ($env && isset($env['HALAL_BLOB_MAX_MB']) && is_numeric($env['HALAL_BLOB_MAX_MB'])) ? (float)$env['HALAL_BLOB_MAX_MB'] : $defaultMaxMB;
+    $maxBytes = (int)round($maxMB * 1024 * 1024);
     $allowedExt = ($env && isset($env['HALAL_BLOB_ALLOWED_EXT']) && is_string($env['HALAL_BLOB_ALLOWED_EXT']) && strlen($env['HALAL_BLOB_ALLOWED_EXT']) > 0) ? $env['HALAL_BLOB_ALLOWED_EXT'] : $defaultExts;
     $allowedExts = array_map('strtolower', array_filter(array_map('trim', explode(',', $allowedExt))));
     return ['key' => $key, 'maxBytes' => $maxBytes, 'allowedExts' => $allowedExts];
@@ -326,9 +327,9 @@ respond_json(200, [
 
 def env_template_content() -> str:
     return (
-        "HALAL_BLOB_KEY=REPLACE_WITH_A_RANDOM_64_CHAR_SECRET\n"
-        "HALAL_BLOB_MAX_BYTES=5242880\n"
-        "HALAL_BLOB_ALLOWED_EXT=jpg,jpeg,png,webp,gif\n"
+        "HALAL_BLOB_KEY=\"REPLACE_WITH_A_RANDOM_64_CHAR_SECRET\"\n"
+        "HALAL_BLOB_MAX_MB=\"5\"\n"
+        "HALAL_BLOB_ALLOWED_EXT=\"jpg,jpeg,png,webp,gif\"\n"
     )
 
 def howto_txt_content() -> str:
@@ -341,9 +342,9 @@ def howto_txt_content() -> str:
         "- Point blob.yourdomain.com to this folder.\n\n"
         "4) .env\n"
         "- Rename .env-template to .env.\n"
-        "- Set HALAL_BLOB_KEY (64–128 chars, no spaces).\n"
-        "- Optional: HALAL_BLOB_MAX_BYTES (default 5MB).\n"
-        "- Optional: HALAL_BLOB_ALLOWED_EXT (default: jpg,jpeg,png,webp,gif).\n\n"
+        "- Set HALAL_BLOB_KEY (64–128 chars). Wrap in quotes.\n"
+        "- Optional: HALAL_BLOB_MAX_MB (default 5). Supports decimals (e.g. \"15.5\").\n"
+        "- Optional: HALAL_BLOB_ALLOWED_EXT (default: jpg,jpeg,png,webp,gif). Wrap in quotes.\n\n"
         "5) Security\n"
         "- api/.htaccess disables indexes and blocks .env/.ini.\n"
         "- blob/.htaccess disables indexes and blocks PHP execution.\n\n"

@@ -13,7 +13,7 @@ await client.ping();
 
 declare type Buffer = unknown;
 
-export const HALAL_BLOB_SDK_VERSION = "1.1.1";
+export const HALAL_BLOB_SDK_VERSION = "1.1.2";
 
 export type HalalBlobClientOptions = {
    baseUrl: string;
