@@ -12,13 +12,14 @@ await client.ping();
 */
 
 declare type Buffer = unknown;
-export const HALAL_BLOB_SDK_VERSION = "1.1.0";
+
+export const HALAL_BLOB_SDK_VERSION = "1.1.1";
 
 export type HalalBlobClientOptions = {
-  baseUrl: string;
-  key: string;
-  fetchImpl?: typeof fetch;
-};
+   baseUrl: string;
+   key: string;
+   fetchImpl?: typeof fetch;
+ };
 
 export type ErrorPayload = { success: false; error: { code: string; message: string } };
 export type UploadResponse = { success: true; url: string; filename: string; path: string; meta: { size_bytes: number; mime_type: string; uploaded_at: string; folder: string; original_name: string; client_ip: string } } | ErrorPayload;

@@ -1,9 +1,10 @@
 from pathlib import Path
+from . import __version__
 
 def write_sdk(root_path: Path) -> None:
     sdk_dir = root_path / "sdk" / "node"
     sdk_dir.mkdir(parents=True, exist_ok=True)
-    content = (
+    head = (
         r"""/**
 Usage example (Next.js 15/16):
 
@@ -18,12 +19,15 @@ await client.ping();
 */
 
 declare type Buffer = unknown;
-
-export type HalalBlobClientOptions = {
-  baseUrl: string;
-  key: string;
-  fetchImpl?: typeof fetch;
-};
+"""
+    )
+    version_line = f"\nexport const HALAL_BLOB_SDK_VERSION = \"{__version__}\";\n\n"
+    tail = (
+        r"""export type HalalBlobClientOptions = {
+   baseUrl: string;
+   key: string;
+   fetchImpl?: typeof fetch;
+ };
 
 export type ErrorPayload = { success: false; error: { code: string; message: string } };
 export type UploadResponse = { success: true; url: string; filename: string; path: string; meta: { size_bytes: number; mime_type: string; uploaded_at: string; folder: string; original_name: string; client_ip: string } } | ErrorPayload;
@@ -84,5 +88,6 @@ export class HalalBlobClient {
 }
 """
     )
+    content = head + version_line + tail
     (sdk_dir / "halalBlobClient.ts").write_text(content, encoding="utf-8")
 
