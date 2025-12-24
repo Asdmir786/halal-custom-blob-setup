@@ -21,11 +21,12 @@ function load_config($envPath) {
     $defaultExts = 'jpg,jpeg,png,webp,gif';
     $env = @parse_ini_file($envPath);
     $key = ($env && isset($env['HALAL_BLOB_KEY'])) ? trim($env['HALAL_BLOB_KEY']) : '';
+    $baseUrl = ($env && isset($env['HALAL_BLOB_BASE_URL'])) ? rtrim(trim($env['HALAL_BLOB_BASE_URL']), '/') : '';
     $maxMB = ($env && isset($env['HALAL_BLOB_MAX_MB']) && is_numeric($env['HALAL_BLOB_MAX_MB'])) ? (float)$env['HALAL_BLOB_MAX_MB'] : $defaultMaxMB;
     $maxBytes = (int)round($maxMB * 1024 * 1024);
     $allowedExt = ($env && isset($env['HALAL_BLOB_ALLOWED_EXT']) && is_string($env['HALAL_BLOB_ALLOWED_EXT']) && strlen($env['HALAL_BLOB_ALLOWED_EXT']) > 0) ? $env['HALAL_BLOB_ALLOWED_EXT'] : $defaultExts;
     $allowedExts = array_map('strtolower', array_filter(array_map('trim', explode(',', $allowedExt))));
-    return ['key' => $key, 'maxBytes' => $maxBytes, 'allowedExts' => $allowedExts];
+    return ['key' => $key, 'baseUrl' => $baseUrl, 'maxBytes' => $maxBytes, 'allowedExts' => $allowedExts];
 }
 
 function require_auth($expectedKey) {
@@ -61,7 +62,11 @@ if (!is_dir($targetDir)) {
 $originalName = $_FILES['file']['name'];
 $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
 $sizeBytes = isset($_FILES['file']['size']) ? (int)$_FILES['file']['size'] : 0;
-$mime = isset($_FILES['file']['type']) ? $_FILES['file']['type'] : '';
+$tmpPath = $_FILES['file']['tmp_name'];
+
+$finfo = finfo_open(FILEINFO_MIME_TYPE);
+$realMime = finfo_file($finfo, $tmpPath);
+finfo_close($finfo);
 
 $mimeMap = [
     'jpg' => 'image/jpeg',
@@ -70,12 +75,13 @@ $mimeMap = [
     'webp' => 'image/webp',
     'gif' => 'image/gif',
 ];
+
 $allowedMimes = [];
 foreach ($cfg['allowedExts'] as $e) {
     if (isset($mimeMap[$e])) { $allowedMimes[] = $mimeMap[$e]; }
 }
 
-if (!in_array($ext, $cfg['allowedExts'], true) || !in_array($mime, $allowedMimes, true)) {
+if (!in_array($ext, $cfg['allowedExts'], true) || !in_array($realMime, $allowedMimes, true)) {
     respond_json(400, ['success' => false, 'error' => ['code' => 'INVALID_TYPE', 'message' => 'Unsupported file type']]);
 }
 
@@ -92,7 +98,8 @@ if (!move_uploaded_file($_FILES['file']['tmp_name'], $targetPath)) {
 }
 
 $relativePath = ($folder ? ($folder . '/') : '') . $filename;
-$url = 'https://blob.yourdomain.com/blob/' . $relativePath;
+$baseUrl = $cfg['baseUrl'] ?: ('https://' . $_SERVER['HTTP_HOST']);
+$url = $baseUrl . '/blob/' . $relativePath;
 
 $meta = [
     'path' => $relativePath,
@@ -119,7 +126,7 @@ respond_json(200, [
     'path' => $relativePath,
     'meta' => [
         'size_bytes' => $sizeBytes,
-        'mime_type' => $mime,
+        'mime_type' => $realMime,
         'uploaded_at' => $meta['uploaded_at'],
         'folder' => $folder,
         'original_name' => $originalName,
@@ -256,7 +263,8 @@ foreach ($entries as $name) {
     $full = $dir . '/' . $name;
     if (!is_file($full)) { continue; }
     $relativePath = ($folder ? ($folder . '/') : '') . $name;
-    $url = 'https://blob.yourdomain.com/blob/' . $relativePath;
+    $baseUrl = $cfg['baseUrl'] ?: ('https://' . $_SERVER['HTTP_HOST']);
+    $url = $baseUrl . '/blob/' . $relativePath;
     $metaPath = $metaRoot . '/' . $relativePath . '.json';
     $meta = null;
     if (is_file($metaPath)) {
@@ -328,6 +336,7 @@ respond_json(200, [
 def env_template_content() -> str:
     return (
         "HALAL_BLOB_KEY=\"REPLACE_WITH_A_RANDOM_64_CHAR_SECRET\"\n"
+        "HALAL_BLOB_BASE_URL=\"https://blob.yourdomain.com\"\n"
         "HALAL_BLOB_MAX_MB=\"5\"\n"
         "HALAL_BLOB_ALLOWED_EXT=\"jpg,jpeg,png,webp,gif\"\n"
     )
@@ -343,6 +352,7 @@ def howto_txt_content() -> str:
         "4) .env\n"
         "- Rename .env-template to .env.\n"
         "- Set HALAL_BLOB_KEY (64–128 chars). Wrap in quotes.\n"
+        "- Set HALAL_BLOB_BASE_URL (e.g. \"https://blob.yourdomain.com\").\n"
         "- Optional: HALAL_BLOB_MAX_MB (default 5). Supports decimals (e.g. \"15.5\").\n"
         "- Optional: HALAL_BLOB_ALLOWED_EXT (default: jpg,jpeg,png,webp,gif). Wrap in quotes.\n\n"
         "5) Security\n"

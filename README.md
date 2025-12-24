@@ -12,11 +12,13 @@ Self-hosted media gateway for Next.js/v0 on cPanel: PHP endpoints for upload/lis
 ## Architecture Overview
 
 - Python Builder (`build_halal_custom_blob_setup.py` + `src/`)
+
   - Creates `api/blob/*.php`, `blob/`, `meta/`, `.env-template`, and a setup guide.
   - Zips output into `halal-custom-blob-setup.zip` at repo root.
   - Writes `sdk/node/halalBlobClient.ts` (not included in the ZIP).
 
 - Blob Gateway (PHP endpoints, deploy on cPanel)
+
   - `upload.php`: Validates auth, size, type, moves file into `blob/`, writes JSON meta.
   - `delete.php`: Deletes a file and its metadata.
   - `list.php`: Lists files in a folder with pagination.
@@ -29,18 +31,18 @@ Self-hosted media gateway for Next.js/v0 on cPanel: PHP endpoints for upload/lis
 
 ## ZIP Output Contents
 
-| Path | Description |
-|------|-------------|
-| `api/blob/upload.php` | Upload endpoint with auth, size/type checks, metadata writing |
-| `api/blob/delete.php` | Delete endpoint removes file and meta |
-| `api/blob/list.php`   | List files with pagination |
-| `api/blob/ping.php`   | Auth-gated health check |
-| `api/.htaccess`       | Disables indexes; blocks `.env`/`.ini` |
-| `blob/.htaccess`      | Disables indexes; blocks PHP execution |
-| `blob/`               | Public asset files live here |
-| `meta/`               | JSON metadata mirroring `blob/` folders |
-| `.env-template`       | Config: `HALAL_BLOB_KEY`, max bytes, allowed types |
-| `How to Setup [EZ].txt` | Deployment and usage guide |
+| Path                    | Description                                                   |
+| ----------------------- | ------------------------------------------------------------- |
+| `api/blob/upload.php`   | Upload endpoint with auth, size/type checks, metadata writing |
+| `api/blob/delete.php`   | Delete endpoint removes file and meta                         |
+| `api/blob/list.php`     | List files with pagination                                    |
+| `api/blob/ping.php`     | Auth-gated health check                                       |
+| `api/.htaccess`         | Disables indexes; blocks `.env`/`.ini`                        |
+| `blob/.htaccess`        | Disables indexes; blocks PHP execution                        |
+| `blob/`                 | Public asset files live here                                  |
+| `meta/`                 | JSON metadata mirroring `blob/` folders                       |
+| `.env-template`         | Config: `HALAL_BLOB_KEY`, max bytes, allowed types            |
+| `How to Setup [EZ].txt` | Deployment and usage guide                                    |
 
 ## Installation on cPanel
 
@@ -48,8 +50,9 @@ Self-hosted media gateway for Next.js/v0 on cPanel: PHP endpoints for upload/lis
 2. Extract the zip.
 3. Rename `.env-template` to `.env`.
 4. Set `HALAL_BLOB_KEY` to a long random string (64–128 chars).
-5. Optionally set `HALAL_BLOB_MAX_BYTES` and `HALAL_BLOB_ALLOWED_EXT`.
-6. Point subdomain `blob.MYDOMAIN.com` to the extracted folder so public files resolve under `https://blob.MYDOMAIN.com/blob/...`.
+5. Set `HALAL_BLOB_BASE_URL` to your subdomain URL (e.g., `https://blob.yourdomain.com`).
+6. Optionally set `HALAL_BLOB_MAX_BYTES` and `HALAL_BLOB_ALLOWED_EXT`.
+7. Point subdomain `blob.MYDOMAIN.com` to the extracted folder so public files resolve under `https://blob.MYDOMAIN.com/blob/...`.
 
 ## Usage in Next.js / Vercel
 
@@ -57,15 +60,16 @@ Self-hosted media gateway for Next.js/v0 on cPanel: PHP endpoints for upload/lis
 - Import the client and pass environment variables.
 
 Environment variables (Next.js):
-- `HALAL_BLOB_BASE_URL` (also expose as `NEXT_PUBLIC_BLOB_BASE_URL` if used in client-side code)
+
+- `HALAL_BLOB_BASE_URL` (e.g. `https://blob.yourdomain.com`)
 - `HALAL_BLOB_KEY`
 
 Example minimal API route (App Router):
 
 ```ts
 // app/api/halal-upload/route.ts
-import { NextResponse } from 'next/server';
-import { HalalBlobClient } from '@/sdk/node/halalBlobClient';
+import { NextResponse } from "next/server";
+import { HalalBlobClient } from "@/sdk/node/halalBlobClient";
 
 export async function POST(request: Request) {
   const client = new HalalBlobClient({
@@ -73,10 +77,14 @@ export async function POST(request: Request) {
     key: process.env.HALAL_BLOB_KEY!,
   });
   const formData = await request.formData();
-  const file = formData.get('file') as File | null;
-  if (!file) return NextResponse.json({ success: false, error: { code: 'NO_FILE', message: 'Missing file' } }, { status: 400 });
-  const folder = (formData.get('folder') as string | null) ?? undefined;
-  const filename = (formData.get('filename') as string | null) ?? undefined;
+  const file = formData.get("file") as File | null;
+  if (!file)
+    return NextResponse.json(
+      { success: false, error: { code: "NO_FILE", message: "Missing file" } },
+      { status: 400 }
+    );
+  const folder = (formData.get("folder") as string | null) ?? undefined;
+  const filename = (formData.get("filename") as string | null) ?? undefined;
   const res = await client.uploadFile(file, { folder, filename });
   return NextResponse.json(res, { status: res.success ? 200 : 400 });
 }
@@ -96,10 +104,9 @@ export async function POST(request: Request) {
 
 ## Versioning
 
-- Current version: `v1.1`
+- Current version: `v1.1.2`
 - Future directions: presigned URLs, moderation API, quotas, built-in dashboard.
 
 ## License
 
 MIT (placeholder).
-
