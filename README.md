@@ -2,6 +2,8 @@
 
 Self-hosted media gateway for Next.js/v0 on cPanel: PHP endpoints for upload/list/delete, a Python builder to package and ship, and a minimal TypeScript SDK for client integration.
 
+**Status:** 🚀 [AI-Ready] | [📚 Integration Guide (For Humans & AI)](./INTEGRATION_GUIDE.md)
+
 ## Why This Exists
 
 - Control: Keep media on your domain (`blob.MYDOMAIN.com`), no vendor lock-in.

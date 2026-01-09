@@ -5,6 +5,7 @@ This SDK in `sdk/node/halalBlobClient.ts` is a small, typed client for the PHP-b
 ## Client Overview
 
 - `HalalBlobClientOptions`
+
   - `baseUrl`: Base URL of the deployed gateway (e.g. `https://blob.yourdomain.com`).
   - `key`: Your gateway auth key (`HALAL_BLOB_KEY`).
   - `fetchImpl?`: Optional `fetch` implementation (defaults to `globalThis.fetch`).
@@ -13,12 +14,131 @@ This SDK in `sdk/node/halalBlobClient.ts` is a small, typed client for the PHP-b
   - `ping()`: Verifies connectivity and auth; returns `{ success, status, php_version, time }`.
   - `uploadFile(file, { folder?, filename? })`: Uploads a file (`Blob | File | Buffer`) to optional `folder` with optional `filename`.
   - `deleteFile(path)`: Deletes a file by its relative path under `blob/`.
-  - `listFiles({ folder?, page?, perPage? })`: Lists files in a folder, paginated.
+- `listFiles({ folder?, page?, perPage? })`: Lists files in a folder, paginated.
+
+## SDK Source Code
+
+Copy this into `sdk/node/halalBlobClient.ts`:
+
+```ts
+/**
+ * Halal Blob Client SDK v1.1.2
+ */
+
+declare type Buffer = unknown;
+
+export type HalalBlobClientOptions = {
+  baseUrl: string;
+  key: string;
+  fetchImpl?: typeof fetch;
+};
+
+export type ErrorPayload = {
+  success: false;
+  error: { code: string; message: string };
+};
+export type UploadResponse =
+  | {
+      success: true;
+      url: string;
+      filename: string;
+      path: string;
+      meta: {
+        size_bytes: number;
+        mime_type: string;
+        uploaded_at: string;
+        folder: string;
+        original_name: string;
+        client_ip: string;
+      };
+    }
+  | ErrorPayload;
+export type DeleteResponse = { success: true } | ErrorPayload;
+export type PingResponse =
+  | { success: true; status: "ok"; php_version: string; time: string }
+  | ErrorPayload;
+export type ListItem = { path: string; url: string; meta?: any };
+export type ListResponse =
+  | {
+      success: true;
+      folder: string;
+      page: number;
+      per_page: number;
+      total: number;
+      files: ListItem[];
+    }
+  | ErrorPayload;
+
+export class HalalBlobClient {
+  private baseUrl: string;
+  private key: string;
+  private fetchImpl: typeof fetch;
+
+  constructor(options: HalalBlobClientOptions) {
+    this.baseUrl = options.baseUrl.replace(/\/$/, "");
+    this.key = options.key;
+    this.fetchImpl = options.fetchImpl ?? (globalThis.fetch as typeof fetch);
+  }
+
+  async ping(): Promise<PingResponse> {
+    const res = await this.fetchImpl(`${this.baseUrl}/api/blob/ping.php`, {
+      headers: { "X-Halal-Blob-Key": this.key },
+    });
+    return res.json();
+  }
+
+  async uploadFile(
+    file: Blob | File | Buffer,
+    options?: { folder?: string; filename?: string }
+  ): Promise<UploadResponse> {
+    const form = new FormData();
+    form.append("file", file as any);
+    if (options?.folder) form.append("folder", options.folder);
+    if (options?.filename) form.append("filename", options.filename);
+    const res = await this.fetchImpl(`${this.baseUrl}/api/blob/upload.php`, {
+      method: "POST",
+      headers: { "X-Halal-Blob-Key": this.key },
+      body: form,
+    });
+    return res.json();
+  }
+
+  async deleteFile(path: string): Promise<DeleteResponse> {
+    const res = await this.fetchImpl(`${this.baseUrl}/api/blob/delete.php`, {
+      method: "POST",
+      headers: {
+        "X-Halal-Blob-Key": this.key,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ path }),
+    });
+    return res.json();
+  }
+
+  async listFiles(options?: {
+    folder?: string;
+    page?: number;
+    perPage?: number;
+  }): Promise<ListResponse> {
+    const params = new URLSearchParams();
+    if (options?.folder) params.set("folder", options.folder);
+    if (options?.page) params.set("page", String(options.page));
+    if (options?.perPage) params.set("per_page", String(options.perPage));
+    const url =
+      `${this.baseUrl}/api/blob/list.php` +
+      (params.toString() ? `?${params.toString()}` : "");
+    const res = await this.fetchImpl(url, {
+      headers: { "X-Halal-Blob-Key": this.key },
+    });
+    return res.json();
+  }
+}
+```
 
 ## Usage Example
 
 ```ts
-import { HalalBlobClient } from './sdk/node/halalBlobClient';
+import { HalalBlobClient } from "./sdk/node/halalBlobClient";
 
 const client = new HalalBlobClient({
   baseUrl: process.env.NEXT_PUBLIC_BLOB_BASE_URL!,
@@ -34,8 +154,8 @@ Below are route handlers you can paste into `app/api/.../route.ts` files.
 
 ```ts
 // app/api/halal-upload/route.ts
-import { NextResponse } from 'next/server';
-import { HalalBlobClient } from '@/sdk/node/halalBlobClient';
+import { NextResponse } from "next/server";
+import { HalalBlobClient } from "@/sdk/node/halalBlobClient";
 
 export async function POST(request: Request) {
   const client = new HalalBlobClient({
@@ -44,10 +164,14 @@ export async function POST(request: Request) {
   });
 
   const formData = await request.formData();
-  const file = formData.get('file') as File | null;
-  const folder = (formData.get('folder') as string | null) ?? undefined;
-  const filename = (formData.get('filename') as string | null) ?? undefined;
-  if (!file) return NextResponse.json({ success: false, error: { code: 'NO_FILE', message: 'Missing file' } }, { status: 400 });
+  const file = formData.get("file") as File | null;
+  const folder = (formData.get("folder") as string | null) ?? undefined;
+  const filename = (formData.get("filename") as string | null) ?? undefined;
+  if (!file)
+    return NextResponse.json(
+      { success: false, error: { code: "NO_FILE", message: "Missing file" } },
+      { status: 400 }
+    );
 
   const res = await client.uploadFile(file, { folder, filename });
   return NextResponse.json(res, { status: res.success ? 200 : 400 });
@@ -56,8 +180,8 @@ export async function POST(request: Request) {
 
 ```ts
 // app/api/halal-delete/route.ts
-import { NextResponse } from 'next/server';
-import { HalalBlobClient } from '@/sdk/node/halalBlobClient';
+import { NextResponse } from "next/server";
+import { HalalBlobClient } from "@/sdk/node/halalBlobClient";
 
 export async function POST(request: Request) {
   const client = new HalalBlobClient({
@@ -67,7 +191,14 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const path = body?.path as string;
-  if (!path) return NextResponse.json({ success: false, error: { code: 'MISSING_PATH', message: 'Missing path' } }, { status: 400 });
+  if (!path)
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: "MISSING_PATH", message: "Missing path" },
+      },
+      { status: 400 }
+    );
 
   const res = await client.deleteFile(path);
   return NextResponse.json(res, { status: res.success ? 200 : 400 });
@@ -76,8 +207,8 @@ export async function POST(request: Request) {
 
 ```ts
 // app/api/halal-list/route.ts
-import { NextResponse } from 'next/server';
-import { HalalBlobClient } from '@/sdk/node/halalBlobClient';
+import { NextResponse } from "next/server";
+import { HalalBlobClient } from "@/sdk/node/halalBlobClient";
 
 export async function GET(request: Request) {
   const client = new HalalBlobClient({
@@ -86,18 +217,30 @@ export async function GET(request: Request) {
   });
 
   const url = new URL(request.url);
-  const folder = url.searchParams.get('folder') ?? undefined;
-  const page = url.searchParams.get('page') ? Number(url.searchParams.get('page')) : undefined;
-  const perPage = url.searchParams.get('per_page') ? Number(url.searchParams.get('per_page')) : undefined;
+  const folder = url.searchParams.get("folder") ?? undefined;
+  const page = url.searchParams.get("page")
+    ? Number(url.searchParams.get("page"))
+    : undefined;
+  const perPage = url.searchParams.get("per_page")
+    ? Number(url.searchParams.get("per_page"))
+    : undefined;
 
-  const res = await client.listFiles({ folder: folder ?? undefined, page, perPage });
+  const res = await client.listFiles({
+    folder: folder ?? undefined,
+    page,
+    perPage,
+  });
   return NextResponse.json(res, { status: res.success ? 200 : 400 });
 }
 ```
 
-## v0 Prompt Template
+## v0 & Agentic AI Usage
 
-Use this prompt to instruct v0 to wire API routes and a minimal dashboard.
+This project is optimized for AI integrations. See the [Integration Guide](./INTEGRATION_GUIDE.md) for detailed AI-specific patterns.
+
+### v0 Prompt Template
+
+Use this prompt to instruct v0 to wire API routes and a minimal dashboard:
 
 ```
 You are building on an existing Next.js 15+ App Router project.

@@ -1,0 +1,8 @@
+# Halal Custom Blob Rules
+
+- **SDK Usage**: Always use `@/sdk/node/halalBlobClient.ts` for interacting with the blob gateway. Do not write raw fetch calls to PHP endpoints.
+- **Environment Variables**: Use `HALAL_BLOB_BASE_URL` and `HALAL_BLOB_KEY`. Ensure they are parsed from `process.env`.
+- **Server-Side Only**: The `HalalBlobClient` must only be instantiated and used in server-side code (API routes, Server Actions, or SSR). NEVER expose the `HALAL_BLOB_KEY` to the client.
+- **File Handling**: When uploading, use the `uploadFile(file, options)` method where `file` is a `Blob`, `File`, or `Buffer`.
+- **Response Handling**: Always check `res.success` from SDK responses before proceeding.
+- **Folder Structure**: Note that files are stored in `blob/` and metadata in `meta/` on the gateway side.
