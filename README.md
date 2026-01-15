@@ -51,6 +51,7 @@ Self-hosted media gateway for Next.js/v0 on cPanel: PHP endpoints for upload/lis
 1. Upload `halal-custom-blob-setup.zip` to your site root or a subfolder.
 2. Extract the zip.
 3. Rename `.env-template` to `.env`.
+   > **Note:** In cPanel File Manager, click **Settings** (top right) and check **"Show Hidden Files (dotfiles)"** if you don't see it!
 4. Set `HALAL_BLOB_KEY` to a long random string (64–128 chars).
 5. Set `HALAL_BLOB_BASE_URL` to your subdomain URL (e.g., `https://blob.yourdomain.com`).
 6. Optionally set `HALAL_BLOB_MAX_BYTES` and `HALAL_BLOB_ALLOWED_EXT`.
