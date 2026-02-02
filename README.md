@@ -54,8 +54,8 @@ Self-hosted media gateway for Next.js/v0 on cPanel: PHP endpoints for upload/lis
    > **Note:** In cPanel File Manager, click **Settings** (top right) and check **"Show Hidden Files (dotfiles)"** if you don't see it!
 4. Set `HALAL_BLOB_KEY` to a long random string (64–128 chars).
 5. Set `HALAL_BLOB_BASE_URL` to your subdomain URL (e.g., `https://blob.yourdomain.com`).
-6. Optionally set `HALAL_BLOB_MAX_BYTES` and `HALAL_BLOB_ALLOWED_EXT`.
-7. Point subdomain `blob.MYDOMAIN.com` to the extracted folder so public files resolve under `https://blob.MYDOMAIN.com/blob/...`.
+6. Optionally set `HALAL_BLOB_MAX_BYTES`, `HALAL_BLOB_ALLOWED_EXT`, and `HALAL_BLOB_PATH`.
+7. Point subdomain `blob.MYDOMAIN.com` to the extracted folder so public files resolve under `https://blob.MYDOMAIN.com/blob/...` (or your custom path).
 
 ## Usage in Next.js / Vercel
 

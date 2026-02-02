@@ -5,8 +5,6 @@ def upload_php_content() -> str:
 header('Content-Type: application/json');
 
 $root = dirname(__DIR__, 2);
-$blobRoot = $root . '/blob';
-$metaRoot = $root . '/meta';
 $envPath = $root . '/.env';
 
 function respond_json($statusCode, $payload) {
@@ -19,6 +17,7 @@ function respond_json($statusCode, $payload) {
 function load_config($envPath) {
     $defaultMaxMB = 5;
     $defaultExts = 'jpg,jpeg,png,webp,gif';
+    $defaultPath = 'blob';
     $env = @parse_ini_file($envPath);
     $key = ($env && isset($env['HALAL_BLOB_KEY'])) ? trim($env['HALAL_BLOB_KEY']) : '';
     $baseUrl = ($env && isset($env['HALAL_BLOB_BASE_URL'])) ? rtrim(trim($env['HALAL_BLOB_BASE_URL']), '/') : '';
@@ -26,7 +25,17 @@ function load_config($envPath) {
     $maxBytes = (int)round($maxMB * 1024 * 1024);
     $allowedExt = ($env && isset($env['HALAL_BLOB_ALLOWED_EXT']) && is_string($env['HALAL_BLOB_ALLOWED_EXT']) && strlen($env['HALAL_BLOB_ALLOWED_EXT']) > 0) ? $env['HALAL_BLOB_ALLOWED_EXT'] : $defaultExts;
     $allowedExts = array_map('strtolower', array_filter(array_map('trim', explode(',', $allowedExt))));
-    return ['key' => $key, 'baseUrl' => $baseUrl, 'maxBytes' => $maxBytes, 'allowedExts' => $allowedExts];
+    
+    $blobPath = ($env && isset($env['HALAL_BLOB_PATH'])) ? trim($env['HALAL_BLOB_PATH'], " \t\n\r\0\x0B/") : $defaultPath;
+    if ($blobPath === '' || !preg_match('/^[A-Za-z0-9_\-]+$/', $blobPath)) { $blobPath = $defaultPath; }
+    
+    return [
+        'key' => $key, 
+        'baseUrl' => $baseUrl, 
+        'maxBytes' => $maxBytes, 
+        'allowedExts' => $allowedExts,
+        'blobPath' => $blobPath
+    ];
 }
 
 function require_auth($expectedKey) {
@@ -40,6 +49,9 @@ function require_auth($expectedKey) {
 
 $cfg = load_config($envPath);
 require_auth($cfg['key']);
+
+$blobRoot = $root . '/' . $cfg['blobPath'];
+$metaRoot = $root . '/meta';
 
 if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
     respond_json(400, ['success' => false, 'error' => ['code' => 'NO_FILE', 'message' => 'No file uploaded']]);
@@ -99,13 +111,13 @@ if (!move_uploaded_file($_FILES['file']['tmp_name'], $targetPath)) {
 
 $relativePath = ($folder ? ($folder . '/') : '') . $filename;
 $baseUrl = $cfg['baseUrl'] ?: ('https://' . $_SERVER['HTTP_HOST']);
-$url = $baseUrl . '/blob/' . $relativePath;
+$url = $baseUrl . '/' . $cfg['blobPath'] . '/' . $relativePath;
 
 $meta = [
     'path' => $relativePath,
     'url' => $url,
     'size_bytes' => $sizeBytes,
-    'mime_type' => $mime,
+    'mime_type' => $realMime,
     'original_name' => $originalName,
     'uploaded_at' => gmdate('c'),
     'client_ip' => isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '',
@@ -140,8 +152,6 @@ def delete_php_content() -> str:
 header('Content-Type: application/json');
 
 $root = dirname(__DIR__, 2);
-$blobRoot = $root . '/blob';
-$metaRoot = $root . '/meta';
 $envPath = $root . '/.env';
 
 function respond_json($statusCode, $payload) {
@@ -152,11 +162,12 @@ function respond_json($statusCode, $payload) {
 }
 
 function load_config($envPath) {
-    $defaultMaxBytes = 5 * 1024 * 1024;
-    $defaultExts = 'jpg,jpeg,png,webp,gif';
+    $defaultPath = 'blob';
     $env = @parse_ini_file($envPath);
     $key = ($env && isset($env['HALAL_BLOB_KEY'])) ? trim($env['HALAL_BLOB_KEY']) : '';
-    return ['key' => $key];
+    $blobPath = ($env && isset($env['HALAL_BLOB_PATH'])) ? trim($env['HALAL_BLOB_PATH'], " \t\n\r\0\x0B/") : $defaultPath;
+    if ($blobPath === '' || !preg_match('/^[A-Za-z0-9_\-]+$/', $blobPath)) { $blobPath = $defaultPath; }
+    return ['key' => $key, 'blobPath' => $blobPath];
 }
 
 function require_auth($expectedKey) {
@@ -170,6 +181,9 @@ function require_auth($expectedKey) {
 
 $cfg = load_config($envPath);
 require_auth($cfg['key']);
+
+$blobRoot = $root . '/' . $cfg['blobPath'];
+$metaRoot = $root . '/meta';
 
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true);
@@ -209,8 +223,6 @@ def list_php_content() -> str:
 header('Content-Type: application/json');
 
 $root = dirname(__DIR__, 2);
-$blobRoot = $root . '/blob';
-$metaRoot = $root . '/meta';
 $envPath = $root . '/.env';
 
 function respond_json($statusCode, $payload) {
@@ -221,10 +233,13 @@ function respond_json($statusCode, $payload) {
 }
 
 function load_config($envPath) {
-    $defaultExts = 'jpg,jpeg,png,webp,gif';
+    $defaultPath = 'blob';
     $env = @parse_ini_file($envPath);
     $key = ($env && isset($env['HALAL_BLOB_KEY'])) ? trim($env['HALAL_BLOB_KEY']) : '';
-    return ['key' => $key];
+    $baseUrl = ($env && isset($env['HALAL_BLOB_BASE_URL'])) ? rtrim(trim($env['HALAL_BLOB_BASE_URL']), '/') : '';
+    $blobPath = ($env && isset($env['HALAL_BLOB_PATH'])) ? trim($env['HALAL_BLOB_PATH'], " \t\n\r\0\x0B/") : $defaultPath;
+    if ($blobPath === '' || !preg_match('/^[A-Za-z0-9_\-]+$/', $blobPath)) { $blobPath = $defaultPath; }
+    return ['key' => $key, 'baseUrl' => $baseUrl, 'blobPath' => $blobPath];
 }
 
 function require_auth($expectedKey) {
@@ -238,6 +253,9 @@ function require_auth($expectedKey) {
 
 $cfg = load_config($envPath);
 require_auth($cfg['key']);
+
+$blobRoot = $root . '/' . $cfg['blobPath'];
+$metaRoot = $root . '/meta';
 
 $folder = isset($_GET['folder']) ? $_GET['folder'] : '';
 $folder = trim($folder);
@@ -264,7 +282,7 @@ foreach ($entries as $name) {
     if (!is_file($full)) { continue; }
     $relativePath = ($folder ? ($folder . '/') : '') . $name;
     $baseUrl = $cfg['baseUrl'] ?: ('https://' . $_SERVER['HTTP_HOST']);
-    $url = $baseUrl . '/blob/' . $relativePath;
+    $url = $baseUrl . '/' . $cfg['blobPath'] . '/' . $relativePath;
     $metaPath = $metaRoot . '/' . $relativePath . '.json';
     $meta = null;
     if (is_file($metaPath)) {
@@ -308,9 +326,12 @@ function respond_json($statusCode, $payload) {
 }
 
 function load_config($envPath) {
+    $defaultPath = 'blob';
     $env = @parse_ini_file($envPath);
     $key = ($env && isset($env['HALAL_BLOB_KEY'])) ? trim($env['HALAL_BLOB_KEY']) : '';
-    return ['key' => $key];
+    $blobPath = ($env && isset($env['HALAL_BLOB_PATH'])) ? trim($env['HALAL_BLOB_PATH'], " \t\n\r\0\x0B/") : $defaultPath;
+    if ($blobPath === '' || !preg_match('/^[A-Za-z0-9_\-]+$/', $blobPath)) { $blobPath = $defaultPath; }
+    return ['key' => $key, 'blobPath' => $blobPath];
 }
 
 function require_auth($expectedKey) {
@@ -330,6 +351,7 @@ respond_json(200, [
     'status' => 'ok',
     'php_version' => PHP_VERSION,
     'time' => gmdate('c'),
+    'blob_path' => $cfg['blobPath'],
 ]);
 """
 
@@ -339,6 +361,7 @@ def env_template_content() -> str:
         "HALAL_BLOB_BASE_URL=\"https://blob.yourdomain.com\"\n"
         "HALAL_BLOB_MAX_MB=\"5\"\n"
         "HALAL_BLOB_ALLOWED_EXT=\"jpg,jpeg,png,webp,gif\"\n"
+        "HALAL_BLOB_PATH=\"blob\"\n"
     )
 
 def howto_txt_content() -> str:
@@ -349,10 +372,13 @@ def howto_txt_content() -> str:
         "2) Config\n"
         "- Rename .env-template to .env\n"
         "  (NOTE: In cPanel File Manager, click 'Settings' (top right) -> Check 'Show Hidden Files' to see .env!)\n"
-        "- Edit .env: Set HALAL_BLOB_KEY (random string) and HALAL_BLOB_BASE_URL.\n\n"
+        "- Edit .env: Set HALAL_BLOB_KEY (random string) and HALAL_BLOB_BASE_URL.\n"
+        "- Optional: Set HALAL_BLOB_PATH to customize the storage/API path (default is 'blob').\n"
+        "  (NOTE: If you change this, you must rename the 'blob' and 'api/blob' folders accordingly!)\n\n"
         "3) Usage\n"
         "- Use the SDK (sdk/node/halalBlobClient.ts) in your App.\n"
         "- Pass env vars: HALAL_BLOB_KEY, HALAL_BLOB_BASE_URL.\n"
+        "- If you customized HALAL_BLOB_PATH, pass it to the client options as 'blobPath'.\n"
     )
 
 def api_htaccess_content() -> str:

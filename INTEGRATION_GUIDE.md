@@ -6,7 +6,7 @@ This guide is designed for developers and AI Agents (v0, Cursor, GPT, etc.) to q
 
 Halal Custom Blob is a self-hosted, PHP-backed media gateway. It allows you to host your own "blob storage" on commodity cPanel/PHP hosting without the overhead or cost of S3 or specialized blob providers.
 
-- **Storage Path:** `blob/` (publicly accessible)
+- **Storage Path:** `blob/` (default, configurable via `HALAL_BLOB_PATH`)
 - **Metadata Path:** `meta/` (shadows blob structure)
 - **SDK:** A generated TypeScript client for Next.js/Node.
 
@@ -38,6 +38,7 @@ declare type Buffer = unknown;
 export type HalalBlobClientOptions = {
   baseUrl: string;
   key: string;
+  blobPath?: string;
   fetchImpl?: typeof fetch;
 };
 
@@ -63,7 +64,7 @@ export type UploadResponse =
   | ErrorPayload;
 export type DeleteResponse = { success: true } | ErrorPayload;
 export type PingResponse =
-  | { success: true; status: "ok"; php_version: string; time: string }
+  | { success: true; status: "ok"; php_version: string; time: string; blob_path: string }
   | ErrorPayload;
 export type ListItem = { path: string; url: string; meta?: any };
 export type ListResponse =
@@ -80,16 +81,18 @@ export type ListResponse =
 export class HalalBlobClient {
   private baseUrl: string;
   private key: string;
+  private blobPath: string;
   private fetchImpl: typeof fetch;
 
   constructor(options: HalalBlobClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.key = options.key;
+    this.blobPath = (options.blobPath ?? "blob").replace(/^\/|\/$/g, "");
     this.fetchImpl = options.fetchImpl ?? (globalThis.fetch as typeof fetch);
   }
 
   async ping(): Promise<PingResponse> {
-    const res = await this.fetchImpl(`${this.baseUrl}/api/blob/ping.php`, {
+    const res = await this.fetchImpl(`${this.baseUrl}/api/${this.blobPath}/ping.php`, {
       headers: { "X-Halal-Blob-Key": this.key },
     });
     return res.json();
@@ -103,7 +106,7 @@ export class HalalBlobClient {
     form.append("file", file as any);
     if (options?.folder) form.append("folder", options.folder);
     if (options?.filename) form.append("filename", options.filename);
-    const res = await this.fetchImpl(`${this.baseUrl}/api/blob/upload.php`, {
+    const res = await this.fetchImpl(`${this.baseUrl}/api/${this.blobPath}/upload.php`, {
       method: "POST",
       headers: { "X-Halal-Blob-Key": this.key },
       body: form,
@@ -112,7 +115,7 @@ export class HalalBlobClient {
   }
 
   async deleteFile(path: string): Promise<DeleteResponse> {
-    const res = await this.fetchImpl(`${this.baseUrl}/api/blob/delete.php`, {
+    const res = await this.fetchImpl(`${this.baseUrl}/api/${this.blobPath}/delete.php`, {
       method: "POST",
       headers: {
         "X-Halal-Blob-Key": this.key,
@@ -133,7 +136,7 @@ export class HalalBlobClient {
     if (options?.page) params.set("page", String(options.page));
     if (options?.perPage) params.set("per_page", String(options.perPage));
     const url =
-      `${this.baseUrl}/api/blob/list.php` +
+      `${this.baseUrl}/api/${this.blobPath}/list.php` +
       (params.toString() ? `?${params.toString()}` : "");
     const res = await this.fetchImpl(url, {
       headers: { "X-Halal-Blob-Key": this.key },
@@ -188,21 +191,21 @@ Always use `FormData` for uploads. Display files using the `url` returned by the
 
 ## 📝 API Specification
 
-### `POST /api/blob/upload.php`
+### `POST /api/{blobPath}/upload.php`
 
 - **Auth:** `X-Halal-Blob-Key` header.
 - **Body:** `multipart/form-data`
   - `file`: The binary file (required).
-  - `folder`: Subdirectory under `blob/` (optional).
+  - `folder`: Subdirectory under `{blobPath}/` (optional).
   - `filename`: Specific name to use (optional, otherwise random UUID used).
 
-### `POST /api/blob/delete.php`
+### `POST /api/{blobPath}/delete.php`
 
 - **Auth:** `X-Halal-Blob-Key` header.
 - **Body:** `application/json`
   - `{ "path": "folder/filename.ext" }`
 
-### `GET /api/blob/list.php`
+### `GET /api/{blobPath}/list.php`
 
 - **Auth:** `X-Halal-Blob-Key` header.
 - **Query Params:** `folder`, `page`, `per_page`.

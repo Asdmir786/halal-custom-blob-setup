@@ -8,12 +8,13 @@ This SDK in `sdk/node/halalBlobClient.ts` is a small, typed client for the PHP-b
 
   - `baseUrl`: Base URL of the deployed gateway (e.g. `https://blob.yourdomain.com`).
   - `key`: Your gateway auth key (`HALAL_BLOB_KEY`).
+  - `blobPath?`: Optional custom path segment (defaults to `blob`).
   - `fetchImpl?`: Optional `fetch` implementation (defaults to `globalThis.fetch`).
 
 - Public methods
-  - `ping()`: Verifies connectivity and auth; returns `{ success, status, php_version, time }`.
+  - `ping()`: Verifies connectivity and auth; returns `{ success, status, php_version, time, blob_path }`.
   - `uploadFile(file, { folder?, filename? })`: Uploads a file (`Blob | File | Buffer`) to optional `folder` with optional `filename`.
-  - `deleteFile(path)`: Deletes a file by its relative path under `blob/`.
+  - `deleteFile(path)`: Deletes a file by its relative path under the configured blob path.
 - `listFiles({ folder?, page?, perPage? })`: Lists files in a folder, paginated.
 
 ## SDK Source Code
@@ -30,6 +31,7 @@ declare type Buffer = unknown;
 export type HalalBlobClientOptions = {
   baseUrl: string;
   key: string;
+  blobPath?: string;
   fetchImpl?: typeof fetch;
 };
 
@@ -55,7 +57,7 @@ export type UploadResponse =
   | ErrorPayload;
 export type DeleteResponse = { success: true } | ErrorPayload;
 export type PingResponse =
-  | { success: true; status: "ok"; php_version: string; time: string }
+  | { success: true; status: "ok"; php_version: string; time: string; blob_path: string }
   | ErrorPayload;
 export type ListItem = { path: string; url: string; meta?: any };
 export type ListResponse =
@@ -72,16 +74,18 @@ export type ListResponse =
 export class HalalBlobClient {
   private baseUrl: string;
   private key: string;
+  private blobPath: string;
   private fetchImpl: typeof fetch;
 
   constructor(options: HalalBlobClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
     this.key = options.key;
+    this.blobPath = (options.blobPath ?? "blob").replace(/^\/|\/$/g, "");
     this.fetchImpl = options.fetchImpl ?? (globalThis.fetch as typeof fetch);
   }
 
   async ping(): Promise<PingResponse> {
-    const res = await this.fetchImpl(`${this.baseUrl}/api/blob/ping.php`, {
+    const res = await this.fetchImpl(`${this.baseUrl}/api/${this.blobPath}/ping.php`, {
       headers: { "X-Halal-Blob-Key": this.key },
     });
     return res.json();
@@ -95,7 +99,7 @@ export class HalalBlobClient {
     form.append("file", file as any);
     if (options?.folder) form.append("folder", options.folder);
     if (options?.filename) form.append("filename", options.filename);
-    const res = await this.fetchImpl(`${this.baseUrl}/api/blob/upload.php`, {
+    const res = await this.fetchImpl(`${this.baseUrl}/api/${this.blobPath}/upload.php`, {
       method: "POST",
       headers: { "X-Halal-Blob-Key": this.key },
       body: form,
@@ -104,7 +108,7 @@ export class HalalBlobClient {
   }
 
   async deleteFile(path: string): Promise<DeleteResponse> {
-    const res = await this.fetchImpl(`${this.baseUrl}/api/blob/delete.php`, {
+    const res = await this.fetchImpl(`${this.baseUrl}/api/${this.blobPath}/delete.php`, {
       method: "POST",
       headers: {
         "X-Halal-Blob-Key": this.key,
@@ -125,7 +129,7 @@ export class HalalBlobClient {
     if (options?.page) params.set("page", String(options.page));
     if (options?.perPage) params.set("per_page", String(options.perPage));
     const url =
-      `${this.baseUrl}/api/blob/list.php` +
+      `${this.baseUrl}/api/${this.blobPath}/list.php` +
       (params.toString() ? `?${params.toString()}` : "");
     const res = await this.fetchImpl(url, {
       headers: { "X-Halal-Blob-Key": this.key },
