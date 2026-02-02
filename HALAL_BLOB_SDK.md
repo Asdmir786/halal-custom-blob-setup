@@ -147,6 +147,7 @@ import { HalalBlobClient } from "./sdk/node/halalBlobClient";
 const client = new HalalBlobClient({
   baseUrl: process.env.NEXT_PUBLIC_BLOB_BASE_URL!,
   key: process.env.HALAL_BLOB_KEY!,
+  blobPath: process.env.HALAL_BLOB_PATH, // Optional: defaults to 'blob'
 });
 
 await client.ping();
@@ -165,6 +166,7 @@ export async function POST(request: Request) {
   const client = new HalalBlobClient({
     baseUrl: process.env.NEXT_PUBLIC_BLOB_BASE_URL!,
     key: process.env.HALAL_BLOB_KEY!,
+    blobPath: process.env.HALAL_BLOB_PATH, // Optional: defaults to 'blob'
   });
 
   const formData = await request.formData();
@@ -191,6 +193,7 @@ export async function POST(request: Request) {
   const client = new HalalBlobClient({
     baseUrl: process.env.NEXT_PUBLIC_BLOB_BASE_URL!,
     key: process.env.HALAL_BLOB_KEY!,
+    blobPath: process.env.HALAL_BLOB_PATH, // Optional: defaults to 'blob'
   });
 
   const body = await request.json();
